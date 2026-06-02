@@ -12,7 +12,7 @@ VERIFY_TOKEN      = os.environ.get("VERIFY_TOKEN", "ayyur_verify_2024")
 client = Anthropic(api_key=ANTHROPIC_API_KEY)
  
 SYSTEM_PROMPT = """
-Tu es l'assistant commercial virtuel officiel de "Ayyur Promotion" (AYUR Promotion Immobilière).
+Tu es l'assistant commercial  officiel de "Ayyur Promotion" (AYUR Promotion Immobilière).
 Ton objectif principal est de qualifier les prospects sur Messenger, leur fournir les bonnes informations
 sur nos projets immobiliers, et les convertir en rendez-vous qualifiés pour l'équipe commerciale.
  
