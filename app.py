@@ -134,9 +134,8 @@ avant de donner la liste. Ne donne que les appartements DISPONIBLES (pas les Ré
    sécurité, confort) et demande le type d'appartement recherché (Studio, F2 ou F3).
  
 2. REPONSES : Donne les infos exactes de la base. Ne propose jamais les appartements Réservés.
-   Si on demande photos/plans :
-   "Je peux tout à fait vous envoyer nos brochures et photos. Préférez-vous les recevoir ici ou être
-   contacté par un conseiller ?"
+   Si on demande des photos sans préciser le type : demande d'abord quel type (Studio, F2 ou F3) puis dis "Je vous envoie les photos tout de suite !"
+   Si on demande les photos d'un type précis (ex: "photos du F3") : dis "Voici les photos de nos F3, j'espère qu'elles vous plairont !" — les photos seront envoyées automatiquement.
  
 3. CONVERSION : Dès que le client montre de l'intérêt, oriente TOUJOURS vers un appel ou un rendez-vous.
    Propose ceci : "Pour aller plus loin, deux options s'offrent à vous :
@@ -152,6 +151,37 @@ Pour toute question hors base (crédit, F4, F1...) :
 "C'est une excellente question. Pour vous répondre avec précision, le mieux est d'échanger avec notre
 équipe. Puis-je avoir votre numéro pour qu'un conseiller vous rappelle ?"
 """
+ 
+# ─── PHOTOS PAR TYPE D'APPARTEMENT ───────────────────────────────────────────
+PHOTOS = {
+    "f3": [
+        "https://i.imgur.com/0BV30nT.jpg",
+        "https://i.imgur.com/hw4lCBd.jpg",
+        "https://i.imgur.com/KMIVk7N.jpg",
+    ],
+    "f2": [
+        "https://i.imgur.com/k6G6BOW.jpg",
+        "https://i.imgur.com/3fMIw03.jpg",
+        "https://i.imgur.com/JJLfrTa.jpg",
+    ],
+    "studio": [
+        "https://i.imgur.com/SgGeWsp.jpg",
+        "https://i.imgur.com/YZORl1G.jpg",
+        "https://i.imgur.com/nuVps0P.jpg",
+    ],
+}
+ 
+def detect_photo_request(text):
+    t = text.lower()
+    if any(w in t for w in ["photo", "image", "voir", "montre", "envoie", "picture", "swer", "swar"]):
+        if "f3" in t:
+            return "f3"
+        if "f2" in t:
+            return "f2"
+        if "studio" in t:
+            return "studio"
+        return "all"
+    return None
  
 conversation_history = {}
  
@@ -180,6 +210,23 @@ def send_message(recipient_id, text):
     for chunk in [text[i:i+1800] for i in range(0, len(text), 1800)]:
         requests.post(url, json={"recipient": {"id": recipient_id}, "message": {"text": chunk}}, timeout=10)
  
+def send_photo(recipient_id, image_url):
+    url = f"https://graph.facebook.com/v19.0/me/messages?access_token={PAGE_ACCESS_TOKEN}"
+    payload = {
+        "recipient": {"id": recipient_id},
+        "message": {
+            "attachment": {
+                "type": "image",
+                "payload": {"url": image_url, "is_reusable": True}
+            }
+        }
+    }
+    requests.post(url, json=payload, timeout=10)
+ 
+def send_photos_for_type(recipient_id, apt_type):
+    for url in PHOTOS.get(apt_type, []):
+        send_photo(recipient_id, url)
+ 
 def typing_on(recipient_id):
     url = f"https://graph.facebook.com/v19.0/me/messages?access_token={PAGE_ACCESS_TOKEN}"
     requests.post(url, json={"recipient": {"id": recipient_id}, "sender_action": "typing_on"}, timeout=5)
@@ -198,9 +245,18 @@ def webhook():
             for event in entry.get("messaging", []):
                 sender_id = event["sender"]["id"]
                 if "message" in event and "text" in event["message"]:
+                    user_text = event["message"]["text"]
                     typing_on(sender_id)
-                    reply = ask_claude(sender_id, event["message"]["text"])
-                    send_message(sender_id, reply)
+ 
+                    photo_type = detect_photo_request(user_text)
+                    if photo_type in ("f3", "f2", "studio"):
+                        reply = ask_claude(sender_id, user_text)
+                        send_message(sender_id, reply)
+                        send_photos_for_type(sender_id, photo_type)
+                    else:
+                        reply = ask_claude(sender_id, user_text)
+                        send_message(sender_id, reply)
+ 
     return jsonify({"status": "ok"}), 200
  
 @app.route("/")
